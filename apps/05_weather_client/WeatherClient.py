@@ -1,8 +1,7 @@
-from bs4 import BeautifulSoup
 import requests
 import collections
 
-Location = collections.namedtuple('Location', 'city state')
+Location = collections.namedtuple('Location', 'city country')
 
 
 def main():
@@ -12,25 +11,42 @@ def main():
     print("-------------------------")
 
     # input location
-    location = input("Enter your location(e.g Portland, OR, US): ")
+    location = input("Enter your location(e.g Portland, OR, US)? ")
 
     # split information from input
     loc = location_splitter(location)
 
-    print(loc.city)
+    # get weather information via API
+    weather_api(loc.city)
 
-    access_weather_web(loc)
+    # show weather information
 
-    # access the weather web
 
-    # if "," in location:
-    #     location_list = location.split(", ")
-    #     city, nation = location_list
-    #
-    # print(city)
-    # print(nation)
+def weather_api(city_name):
+    api_key = open('api_key', 'r').read()
+    base_url = f"http://api.openweathermap.org/data/2.5/weather?q={city_name}&appid={api_key}"
 
-    # call_weather(location)
+    response = requests.get(base_url)
+    data = response.json()
+
+    if data["cod"] == 200:
+        # Weather data is in data["main"], data["weather"], and so on.
+
+        city = data["name"]
+        country = data["sys"]["country"]
+        temp = data["main"]["temp"]     # convert to celsius or fahrenheit
+        temp = temp_converter(temp)
+        cloud = data["weather"][0]["main"]
+
+        show_weather(city, country, temp, cloud)
+    else:
+        print("City not found")
+
+
+def temp_converter(kelvin):
+    celsius = kelvin - 273.15
+    fahrenheit = celsius * (9/5) + 32
+    return fahrenheit
 
 
 def location_splitter(location):
@@ -38,9 +54,9 @@ def location_splitter(location):
     if not location or not location.strip():
         return None
 
-    # create
+    # create default value
     city = ""
-    state = ""
+    country = ""
 
     location = location.lower().strip()
     parts = location.split(",")
@@ -49,39 +65,16 @@ def location_splitter(location):
         city = parts[0].strip()
     elif len(parts) == 2:
         city = parts[0].strip()
-        state = parts[1].strip()
+        country = parts[1].strip()
     else:
         return None
 
-    # print(f"city: {city}, state: {state}}")
-
     # store stripped result in Location tuple
-    return Location(city, state)
+    return Location(city, country)
 
 
-def access_weather_web(loc: Location):
-    # get base URL
-    base_URL = f"https://www.wunderground.com/weather/{loc.state}/{loc.city}"
-    page = requests.get(base_URL)
-
-    soup = BeautifulSoup(page.content, "html.parser")
-
-    # get the parent div that contains the information needed.
-    current_condition = soup.find("div", class_="city-conditions")
-
-    temp = current_condition.find("span", class_="wu-value")
-
-    div_parent = current_condition.find_all('div', class_='conditions-extra')
-    for div in div_parent:
-        p_element = div.find("p")
-        if p_element:
-            condition = p_element.get_text()
-
-    print(temp.text.strip())
-    print(condition)
-
-    print(f"The weather in {loc.city}, {loc.state} is {temp.text.strip()} F and Clouds:{condition}.")
-
+def show_weather(city, country, temp, cloud):
+    print(f"The weather in {city}, {country} is {temp:.2f} F and Clouds: {cloud}.")
 
 
 if __name__ == '__main__':
